@@ -1,20 +1,17 @@
+from f5_tts.model.utils import convert_char_to_pinyin, get_tokenizer
+from f5_tts.model import CFM
+from f5_tts.infer.utils_infer import load_checkpoint, load_vocoder, save_spectrogram
+from omegaconf import OmegaConf
+from hydra.utils import get_class
+from cached_path import cached_path
+import torchaudio
+import torch.nn.functional as F
+import torch
+from importlib.resources import files
 import os
 
 
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"  # for MPS device compatibility
-
-from importlib.resources import files
-
-import torch
-import torch.nn.functional as F
-import torchaudio
-from cached_path import cached_path
-from hydra.utils import get_class
-from omegaconf import OmegaConf
-
-from f5_tts.infer.utils_infer import load_checkpoint, load_vocoder, save_spectrogram
-from f5_tts.model import CFM
-from f5_tts.model.utils import convert_char_to_pinyin, get_tokenizer
 
 
 device = (
@@ -43,7 +40,8 @@ speed = 1.0
 target_rms = 0.1
 
 
-model_cfg = OmegaConf.load(str(files("f5_tts").joinpath(f"configs/{exp_name}.yaml")))
+model_cfg = OmegaConf.load(
+    str(files("f5_tts").joinpath(f"configs/{exp_name}.yaml")))
 model_cls = get_class(f"f5_tts.model.{model_cfg.model.backbone}")
 model_arc = model_cfg.model.arch
 
@@ -59,7 +57,8 @@ n_fft = model_cfg.model.mel_spec.n_fft
 
 
 # ckpt_path = str(files("f5_tts").joinpath("../../")) + f"/ckpts/{exp_name}/model_{ckpt_step}.safetensors"
-ckpt_path = str(cached_path(f"hf://SWivid/F5-TTS/{exp_name}/model_{ckpt_step}.safetensors"))
+ckpt_path = str(cached_path(
+    "hf://Misha24-10/F5-TTS_RUSSIAN/F5TTS_v1_Base_v2/model_last_inference.safetensors"))
 output_dir = "tests"
 
 
@@ -71,7 +70,8 @@ output_dir = "tests"
 # [--language "zho" for Chinese, "eng" for English]
 # [if local ckpt, set --alignment_model "../checkpoints/mms-300m-1130-forced-aligner"]
 
-audio_to_edit = str(files("f5_tts").joinpath("infer/examples/basic/basic_ref_en.wav"))
+audio_to_edit = str(files("f5_tts").joinpath(
+    "infer/examples/basic/basic_ref_en.wav"))
 origin_text = "Some call me nature, others call me mother nature."
 target_text = "Some call me optimist, others call me realist."
 parts_to_edit = [
@@ -103,14 +103,16 @@ if mel_spec_type == "vocos":
     vocoder_local_path = "../checkpoints/charactr/vocos-mel-24khz"
 elif mel_spec_type == "bigvgan":
     vocoder_local_path = "../checkpoints/bigvgan_v2_24khz_100band_256x"
-vocoder = load_vocoder(vocoder_name=mel_spec_type, is_local=local, local_path=vocoder_local_path)
+vocoder = load_vocoder(vocoder_name=mel_spec_type,
+                       is_local=local, local_path=vocoder_local_path)
 
 # Tokenizer
 vocab_char_map, vocab_size = get_tokenizer(dataset_name, tokenizer)
 
 # Model
 model = CFM(
-    transformer=model_cls(**model_arc, text_num_embeds=vocab_size, mel_dim=n_mel_channels),
+    transformer=model_cls(
+        **model_arc, text_num_embeds=vocab_size, mel_dim=n_mel_channels),
     mel_spec_kwargs=dict(
         n_fft=n_fft,
         hop_length=hop_length,
@@ -146,18 +148,21 @@ for part in parts_to_edit:
     part_dur = end - start if fix_duration is None else fix_duration.pop(0)
     part_dur = part_dur * target_sample_rate
     start = start * target_sample_rate
-    audio_ = torch.cat((audio_, audio[:, round(offset) : round(start)], torch.zeros(1, round(part_dur))), dim=-1)
+    audio_ = torch.cat((audio_, audio[:, round(offset): round(
+        start)], torch.zeros(1, round(part_dur))), dim=-1)
     edit_mask = torch.cat(
         (
             edit_mask,
-            torch.ones(1, round((start - offset) / hop_length), dtype=torch.bool),
+            torch.ones(1, round((start - offset) / hop_length),
+                       dtype=torch.bool),
             torch.zeros(1, round(part_dur / hop_length), dtype=torch.bool),
         ),
         dim=-1,
     )
     offset = end * target_sample_rate
-audio = torch.cat((audio_, audio[:, round(offset) :]), dim=-1)
-edit_mask = F.pad(edit_mask, (0, audio.shape[-1] // hop_length - edit_mask.shape[-1] + 1), value=True)
+audio = torch.cat((audio_, audio[:, round(offset):]), dim=-1)
+edit_mask = F.pad(
+    edit_mask, (0, audio.shape[-1] // hop_length - edit_mask.shape[-1] + 1), value=True)
 audio = audio.to(device)
 edit_mask = edit_mask.to(device)
 
@@ -200,6 +205,8 @@ with torch.inference_mode():
     if rms < target_rms:
         generated_wave = generated_wave * rms / target_rms
 
-    save_spectrogram(gen_mel_spec[0].cpu().numpy(), f"{output_dir}/speech_edit_out.png")
-    torchaudio.save(f"{output_dir}/speech_edit_out.wav", generated_wave, target_sample_rate)
+    save_spectrogram(gen_mel_spec[0].cpu().numpy(),
+                     f"{output_dir}/speech_edit_out.png")
+    torchaudio.save(f"{output_dir}/speech_edit_out.wav",
+                    generated_wave, target_sample_rate)
     print(f"Generated wav: {generated_wave.shape}")

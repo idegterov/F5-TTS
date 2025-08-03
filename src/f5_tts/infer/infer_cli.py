@@ -41,7 +41,8 @@ parser.add_argument(
     "-c",
     "--config",
     type=str,
-    default=os.path.join(files("f5_tts").joinpath("infer/examples/basic"), "basic.toml"),
+    default=os.path.join(files("f5_tts").joinpath(
+        "infer/examples/basic"), "basic.toml"),
     help="The configuration file, default see infer/examples/basic/basic.toml",
 )
 
@@ -188,13 +189,15 @@ model = args.model or config.get("model", "F5TTS_v1_Base")
 ckpt_file = args.ckpt_file or config.get("ckpt_file", "")
 vocab_file = args.vocab_file or config.get("vocab_file", "")
 
-ref_audio = args.ref_audio or config.get("ref_audio", "infer/examples/basic/basic_ref_en.wav")
+ref_audio = args.ref_audio or config.get(
+    "ref_audio", "infer/examples/basic/basic_ref_en.wav")
 ref_text = (
     args.ref_text
     if args.ref_text is not None
     else config.get("ref_text", "Some call me nature, others call me mother nature.")
 )
-gen_text = args.gen_text or config.get("gen_text", "Here we generate something just for test.")
+gen_text = args.gen_text or config.get(
+    "gen_text", "Here we generate something just for test.")
 gen_file = args.gen_file or config.get("gen_file", "")
 
 output_dir = args.output_dir or config.get("output_dir", "tests")
@@ -203,21 +206,25 @@ output_file = args.output_file or config.get(
 )
 
 save_chunk = args.save_chunk or config.get("save_chunk", False)
-use_legacy_text = args.no_legacy_text or config.get("no_legacy_text", False)  # no_legacy_text is a store_false arg
+use_legacy_text = args.no_legacy_text or config.get(
+    "no_legacy_text", False)  # no_legacy_text is a store_false arg
 if save_chunk and use_legacy_text:
     print(
         "\nWarning to --save_chunk: lossy ASCII transliterations of unicode text for legacy (.wav) file names, --no_legacy_text to disable.\n"
     )
 
 remove_silence = args.remove_silence or config.get("remove_silence", False)
-load_vocoder_from_local = args.load_vocoder_from_local or config.get("load_vocoder_from_local", False)
+load_vocoder_from_local = args.load_vocoder_from_local or config.get(
+    "load_vocoder_from_local", False)
 
 vocoder_name = args.vocoder_name or config.get("vocoder_name", mel_spec_type)
 target_rms = args.target_rms or config.get("target_rms", target_rms)
-cross_fade_duration = args.cross_fade_duration or config.get("cross_fade_duration", cross_fade_duration)
+cross_fade_duration = args.cross_fade_duration or config.get(
+    "cross_fade_duration", cross_fade_duration)
 nfe_step = args.nfe_step or config.get("nfe_step", nfe_step)
 cfg_strength = args.cfg_strength or config.get("cfg_strength", cfg_strength)
-sway_sampling_coef = args.sway_sampling_coef or config.get("sway_sampling_coef", sway_sampling_coef)
+sway_sampling_coef = args.sway_sampling_coef or config.get(
+    "sway_sampling_coef", sway_sampling_coef)
 speed = args.speed or config.get("speed", speed)
 fix_duration = args.fix_duration or config.get("fix_duration", fix_duration)
 device = args.device or config.get("device", device)
@@ -232,7 +239,8 @@ if "voices" in config:
     for voice in config["voices"]:
         voice_ref_audio = config["voices"][voice]["ref_audio"]
         if "infer/examples/" in voice_ref_audio:
-            config["voices"][voice]["ref_audio"] = str(files("f5_tts").joinpath(f"{voice_ref_audio}"))
+            config["voices"][voice]["ref_audio"] = str(
+                files("f5_tts").joinpath(f"{voice_ref_audio}"))
 
 
 # ignore gen_text if gen_file provided
@@ -246,7 +254,8 @@ if gen_file:
 wave_path = Path(output_dir) / output_file
 # spectrogram_path = Path(output_dir) / "infer_cli_out.png"
 if save_chunk:
-    output_chunk_dir = os.path.join(output_dir, f"{Path(output_file).stem}_chunks")
+    output_chunk_dir = os.path.join(
+        output_dir, f"{Path(output_file).stem}_chunks")
     if not os.path.exists(output_chunk_dir):
         os.makedirs(output_chunk_dir)
 
@@ -266,7 +275,8 @@ vocoder = load_vocoder(
 # load TTS model
 
 model_cfg = OmegaConf.load(
-    args.model_cfg or config.get("model_cfg", str(files("f5_tts").joinpath(f"configs/{model}.yaml")))
+    args.model_cfg or config.get("model_cfg", str(
+        files("f5_tts").joinpath(f"configs/{model}.yaml")))
 )
 model_cls = get_class(f"f5_tts.model.{model_cfg.model.backbone}")
 model_arc = model_cfg.model.arch
@@ -277,18 +287,27 @@ if model != "F5TTS_Base":
     assert vocoder_name == model_cfg.model.mel_spec.mel_spec_type
 
 # override for previous models
-if model == "F5TTS_Base":
+if model == "F5TTS_v1_Base":
+    # Use the new Russian model as default
+    if not ckpt_file:
+        ckpt_file = str(cached_path(
+            "hf://Misha24-10/F5-TTS_RUSSIAN/F5TTS_v1_Base_v2/model_last_inference.safetensors"))
+elif model == "F5TTS_Base":
     if vocoder_name == "vocos":
         ckpt_step = 1200000
     elif vocoder_name == "bigvgan":
         model = "F5TTS_Base_bigvgan"
         ckpt_type = "pt"
 elif model == "E2TTS_Base":
-    repo_name = "E2-TTS"
-    ckpt_step = 1200000
+    # Use the new Russian model as default
+    if not ckpt_file:
+        ckpt_file = str(cached_path(
+            "hf://Misha24-10/F5-TTS_RUSSIAN/F5TTS_v1_Base_v2/model_last_inference.safetensors"))
 
+# Only use the old fallback logic if ckpt_file is not already set
 if not ckpt_file:
-    ckpt_file = str(cached_path(f"hf://SWivid/{repo_name}/{model}/model_{ckpt_step}.{ckpt_type}"))
+    ckpt_file = str(cached_path(
+        f"hf://SWivid/{repo_name}/{model}/model_{ckpt_step}.{ckpt_type}"))
 
 print(f"Using {model}...")
 ema_model = load_model(
@@ -360,7 +379,8 @@ def main():
             if use_legacy_text:
                 gen_text_ = unidecode(gen_text_)
             sf.write(
-                os.path.join(output_chunk_dir, f"{len(generated_audio_segments) - 1}_{gen_text_}.wav"),
+                os.path.join(
+                    output_chunk_dir, f"{len(generated_audio_segments) - 1}_{gen_text_}.wav"),
                 audio_segment,
                 final_sample_rate,
             )

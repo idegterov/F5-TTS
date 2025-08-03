@@ -80,7 +80,8 @@ class TTSStreamingProcessor:
             if torch.backends.mps.is_available()
             else "cpu"
         )
-        model_cfg = OmegaConf.load(str(files("f5_tts").joinpath(f"configs/{model}.yaml")))
+        model_cfg = OmegaConf.load(
+            str(files("f5_tts").joinpath(f"configs/{model}.yaml")))
         self.model_cls = get_class(f"f5_tts.model.{model_cfg.model.backbone}")
         self.model_arc = model_cfg.model.arch
         self.mel_spec_type = model_cfg.model.mel_spec.mel_spec_type
@@ -110,14 +111,18 @@ class TTSStreamingProcessor:
         return load_vocoder(vocoder_name=self.mel_spec_type, is_local=False, local_path=None, device=self.device)
 
     def update_reference(self, ref_audio, ref_text):
-        self.ref_audio, self.ref_text = preprocess_ref_audio_text(ref_audio, ref_text)
+        self.ref_audio, self.ref_text = preprocess_ref_audio_text(
+            ref_audio, ref_text)
         self.audio, self.sr = torchaudio.load(self.ref_audio)
 
         ref_audio_duration = self.audio.shape[-1] / self.sr
         ref_text_byte_len = len(self.ref_text.encode("utf-8"))
-        self.max_chars = int(ref_text_byte_len / (ref_audio_duration) * (25 - ref_audio_duration))
-        self.few_chars = int(ref_text_byte_len / (ref_audio_duration) * (25 - ref_audio_duration) / 2)
-        self.min_chars = int(ref_text_byte_len / (ref_audio_duration) * (25 - ref_audio_duration) / 4)
+        self.max_chars = int(ref_text_byte_len /
+                             (ref_audio_duration) * (25 - ref_audio_duration))
+        self.few_chars = int(
+            ref_text_byte_len / (ref_audio_duration) * (25 - ref_audio_duration) / 2)
+        self.min_chars = int(
+            ref_text_byte_len / (ref_audio_duration) * (25 - ref_audio_duration) / 4)
 
     def _warm_up(self):
         logger.info("Warming up the model...")
@@ -138,8 +143,10 @@ class TTSStreamingProcessor:
     def generate_stream(self, text, conn):
         text_batches = chunk_text(text, max_chars=self.max_chars)
         if self.first_package:
-            text_batches = chunk_text(text_batches[0], max_chars=self.few_chars) + text_batches[1:]
-            text_batches = chunk_text(text_batches[0], max_chars=self.min_chars) + text_batches[1:]
+            text_batches = chunk_text(
+                text_batches[0], max_chars=self.few_chars) + text_batches[1:]
+            text_batches = chunk_text(
+                text_batches[0], max_chars=self.min_chars) + text_batches[1:]
             self.first_package = False
 
         audio_stream = infer_batch_process(
@@ -157,12 +164,14 @@ class TTSStreamingProcessor:
         # Reset the file writer thread
         if self.file_writer_thread is not None:
             self.file_writer_thread.stop()
-        self.file_writer_thread = AudioFileWriterThread("output.wav", self.sampling_rate)
+        self.file_writer_thread = AudioFileWriterThread(
+            "output.wav", self.sampling_rate)
         self.file_writer_thread.start()
 
         for audio_chunk, _ in audio_stream:
             if len(audio_chunk) > 0:
-                logger.info(f"Generated audio chunk of size: {len(audio_chunk)}")
+                logger.info(
+                    f"Generated audio chunk of size: {len(audio_chunk)}")
 
                 # Send audio chunk via socket
                 conn.sendall(struct.pack(f"{len(audio_chunk)}f", *audio_chunk))
@@ -224,7 +233,8 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--ckpt_file",
-        default=str(hf_hub_download(repo_id="SWivid/F5-TTS", filename="F5TTS_v1_Base/model_1250000.safetensors")),
+        default=str(hf_hub_download(repo_id="Misha24-10/F5-TTS_RUSSIAN",
+                    filename="F5TTS_v1_Base_v2/model_last_inference.safetensors")),
         help="Path to the model checkpoint file",
     )
     parser.add_argument(
@@ -235,7 +245,8 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--ref_audio",
-        default=str(files("f5_tts").joinpath("infer/examples/basic/basic_ref_en.wav")),
+        default=str(files("f5_tts").joinpath(
+            "infer/examples/basic/basic_ref_en.wav")),
         help="Reference audio to provide model with speaker characteristics",
     )
     parser.add_argument(
@@ -244,8 +255,10 @@ if __name__ == "__main__":
         help="Reference audio subtitle, leave empty to auto-transcribe",
     )
 
-    parser.add_argument("--device", default=None, help="Device to run the model on")
-    parser.add_argument("--dtype", default=torch.float32, help="Data type to use for model inference")
+    parser.add_argument("--device", default=None,
+                        help="Device to run the model on")
+    parser.add_argument("--dtype", default=torch.float32,
+                        help="Data type to use for model inference")
 
     args = parser.parse_args()
 
