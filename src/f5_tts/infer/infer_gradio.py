@@ -1097,8 +1097,8 @@ If you're having issues, try converting your reference audio to WAV or MP3, clip
     )
 
     gr.TabbedInterface(
-        [app_tts, app_multistyle, app_chat, app_credits],
-        ["Basic-TTS", "Multi-Speech", "Voice-Chat", "Credits"],
+        [app_tts, app_multistyle, app_chat],
+        ["Basic-TTS", "Multi-Speech", "Voice-Chat"],
     )
 
 
